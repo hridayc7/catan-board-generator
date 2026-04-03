@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <script>
+      const RESOURCES = ['wood', 'brick', 'wheat', 'sheep', 'ore'];
+      const TILES_LAYOUT = ['forest', 'forest', 'forest', 'forest', 'field', 'field', 'field', 'field', 'pasture', 'pasture', 'pasture', 'pasture', 'hill', 'hill', 'hill', 'mountain', 'mountain', 'mountain', 'desert'];
+      const TOKENS = [6, 8, 5, 9, 4, 10, 3, 11, 6, 8, 5, 9, 4, 10, 3, 11, 2, 12];
+
+      function generateCatanBoard(constraints) {
+        let weights = { wood: 1, brick: 1, wheat: 1, sheep: 1, ore: 1 };
+        
+        if (constraints.road_heavy) { weights.wood += 3; weights.brick += 3; }
+        if (constraints.dev_card_farm) { weights.wheat += 2; weights.sheep += 2; weights.ore += 2; }
+        if (constraints.stone_heavy) { weights.ore += 5; }
+        if (constraints.wheat_favored) { weights.wheat += 4; }
+        if (constraints.wood_favored) { weights.wood += 4; }
+        if (constraints.brick_favored) { weights.brick += 4; }
+        if (constraints.sheep_favored) { weights.sheep += 4; }
+
+        let shuffledTiles = [...TILES_LAYOUT].sort(() => Math.random() - 0.5);
+        let powerTokens = [...TOKENS].sort((a, b) => (6 - Math.abs(7 - b)) - (6 - Math.abs(7 - a)));
+
+        let prioritizedTiles = shuffledTiles
+          .filter(t => t !== 'desert')
+          .sort((a, b) => {
+            const getRes = (t) => ({ forest: 'wood', hill: 'brick', field: 'wheat', pasture: 'sheep', mountain: 'ore' }[t]);
+            let wA = weights[getRes(a)] || 1;
+            let wB = weights[getRes(b)] || 1;
+            return (wB * Math.random()) - (wA * Math.random()); 
+          });
+
+        let board = prioritizedTiles.map((tile, index) => ({ resource: tile, token: powerTokens[index] }));
+        
+        // Randomly scatter the pairs so high tokens aren't always top-left
+        board.sort(() => Math.random() - 0.5);
+        
+        const desertIndex = Math.floor(Math.random() * 19);
+        board.splice(desertIndex, 0, { resource: 'desert', token: null });
+        
+        return board;
+      }
+
+      window['ai_edge_gallery_get_result'] = async (data) => {
+        try {
+          let constraints = {};
+          if (data && typeof data === 'string' && data.trim() !== '') {
+             constraints = JSON.parse(data);
+          }
+          const boardLayout = generateCatanBoard(constraints);
+          const payload = {
+            layout: boardLayout,
+            name: constraints.board_name || "Your Custom Board"
+          };
+          const encodedBoard = encodeURIComponent(JSON.stringify(payload));
+
+          return JSON.stringify({
+            result: "Successfully generated the custom board.",
+            webview: {
+              url: `webview.html?boardData=${encodedBoard}`
+            }
+          });
+        } catch (e) {
+          console.error(e);
+          return JSON.stringify({error: `Failed to generate board: ${e.message}`});
+        }
+      };
+    </script>
+  </body>
+</html>
